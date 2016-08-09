@@ -3,8 +3,6 @@ Project written in python which will wait until target responds to a ping reques
 
 usage: pingWait [-h] [-b] [--eternal] [-d N] [-v] [-t N] HOSTNAME
 
-Will ping host until it replies.
-
 positional arguments:
   HOSTNAME    Hostname or ip of the target host.
 
