@@ -2,25 +2,41 @@
 
 import ping, argparse, time, os, sys, signal
 
-parser = argparse.ArgumentParser(description='Project written in python which will wait until target responds to a ping request and will then terminate.')
+class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
+    pass
+
+parser = argparse.ArgumentParser(description='pingWait will send ping packets until target replies and will then terminate successfully.',
+  epilog="\n".join([
+    'Example :',
+    '%s 8.8.8.8 && echo "Server is now up."' % sys.argv[0],
+    '%s 192.168.1.129 && echo "Server is now responding to ping" | nc -c 127.0.0.1 27016' % sys.argv[0],
+    '%s 192.168.1.129 && echo "The server is now up and running" | mail -s "pingWait response" ogelami@gmail.com' % sys.argv[0],
+    '%s 8.8.8.8 -b --eternal' % sys.argv[0],
+    ]), formatter_class=CustomFormatter)
 
 #parser.add_argument('-H', '--hostname', dest='hostname', required=True, help='Host name, IP Address')
-parser.add_argument('hostname', default=1, metavar='HOSTNAME', help='Hostname or ip of the target host.')
+parser.add_argument('hostname', default=1, metavar='HOSTNAME', help='Hostname or ip of the target host')
 parser.add_argument('-b', dest='beep', action='store_true', required=False, help='Beep when found')
-parser.add_argument('--eternal', dest='eternal', action='store_true', required=False, help='Will continue to ping.')
-parser.add_argument('-d', default=5, metavar='N', dest='delay', type=int, required=False, help='Sleep delay between pings.')
-parser.add_argument('-v', dest='verbose', action='store_true', required=False, help='Verbose')
-parser.add_argument('-t', default=1, metavar='N', dest='timeout', type=float, required=False, help='Ping timeout in seconds.')
+parser.add_argument('--eternal', dest='eternal', action='store_true', required=False, help='Will continue to ping')
+parser.add_argument('-d', default=5, metavar='N', dest='delay', type=int, required=False, help='Sleep delay between pings in seconds')
+parser.add_argument('-v', dest='verbose', action='store_true', required=False, help='Verbose logging')
+parser.add_argument('-t', default=1, metavar='N', dest='timeout', type=float, required=False, help='Timeout for ping in seconds')
 
 args = parser.parse_args()
 
 def sigInt(signal, frame):
+
   print("\nShutting down.")
   exit(1)
 
-signal.signal(signal.SIGINT, sigInt)
+def verboseMessage(message):
+
+  if args.verbose:
+    print(message)
+
 
 def authenticate():
+
   if os.name == 'nt':
     from win32com.shell.shell import ShellExecuteEx
     import ctypes
@@ -28,44 +44,46 @@ def authenticate():
     try:
       if ctypes.windll.shell32.IsUserAnAdmin():
         return True
+
     except:
       traceback.print_exc()
 
+    verboseMessage('Authenticating.')
     params = ' '.join([script] + sys.argv[1:] + ['SYSTEM'])
     shell.ShellExecuteEx(lpVerb='runas', lpFile=sys.executable, lpParameters=params)
-    sys.exit(0)
+    exit(1)
       
   elif os.name == 'posix':
     if os.geteuid() != 0:
-#      print 'You need to be root to send ping packets, running sudo...'
+      verboseMessage('Authenticating.')
       args = ['sudo', sys.executable] + sys.argv + [os.environ]
       os.execlpe('sudo', *args)
+      exit(1)
+
     else:
       return True
-    
+
+
+signal.signal(signal.SIGINT, sigInt)
+
 if not authenticate():
   print "Failed to authenticate."
   exit(1)
 
-if args.verbose:
-  print("Pinging target:")
+verboseMessage("Pinging target:")
 
 while True:
   pingResult = ping.quiet_ping(args.hostname, count=1, timeout=args.timeout)
 
-  if args.verbose:
-    print(pingResult)
+  verboseMessage(pingResult)
 
   if pingResult[1] != None:
-    if args.verbose:
-      print("Got response!")
+    verboseMessage("Got response!")
     if args.beep:
-      if args.verbose:
-        print("Beep")
+      verboseMessage("Beep")
       sys.stdout.write("\x07" * 3)
     if not args.eternal:
-      if args.verbose:
-        print("Sequence compelte.")
+      verboseMessage("Sequence compelte.")
       exit(0)
 
   time.sleep(args.delay);
